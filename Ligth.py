@@ -38,9 +38,16 @@ class ElectricityMonitor:
         raise Exception("Не найден беспроводной интерфейс")
 
     def scan_wifi_networks(self):
-        self.iface.scan()
-        time.sleep(3)
-        return len(self.iface.scan_results())
+        if self.iface:
+            if self.iface.status() == const.IFACE_DISCONNECTED:
+                return 0
+            self.iface.scan()
+            time.sleep(3)
+            results = self.iface.scan_results()
+            if results:
+                return len(results)
+        return 0
+
 
 class ElectricityMonitorApp:
     def __init__(self, master):
@@ -89,8 +96,29 @@ class ElectricityMonitorApp:
         self.status_value_label = ttk.Label(self.master, textvariable=self.status_var)
         self.status_value_label.grid(row=3, column=1, sticky="w")
 
+        self.interface_label = ttk.Label(self.master, text="Ваш интерфейс:")
+        self.interface_label.grid(row=4, column=0, sticky="w")
+
+        self.interface_var = tk.StringVar()
+        self.interface_var.set("Неизвестно")
+        self.interface_value_label = ttk.Label(self.master, textvariable=self.interface_var)
+        self.interface_value_label.grid(row=4, column=1, sticky="w")
+
         self.start_stop_button = ttk.Button(self.master, text="Старт", command=self.toggle_monitoring)
-        self.start_stop_button.grid(row=4, columnspan=2)
+        self.start_stop_button.grid(row=5, columnspan=2)
+
+    def update_interface_status(self):
+        if self.monitor.iface:
+            interface_name = self.monitor.iface.name()
+            interface_status = self.monitor.iface.status()
+            if interface_status == const.IFACE_CONNECTED:
+                self.interface_var.set(f"{interface_name}: Подключен")
+            elif interface_status == const.IFACE_DISCONNECTED:
+                self.interface_var.set(f"{interface_name}: Отключен")
+            else:
+                self.interface_var.set("Неизвестно")
+        else:
+            self.interface_var.set("Не найден")
 
     def generate_notification_filename(self, message):
         hash_object = hashlib.md5(message.encode())
@@ -118,6 +146,7 @@ class ElectricityMonitorApp:
             self.send_notification()
         else:
             self.status_var.set("Выключен")
+        self.update_interface_status()
         self.master.update()
 
     def start_monitoring(self):
