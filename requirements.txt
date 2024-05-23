@@ -1,0 +1,4 @@
+tk
+pywifi
+gtts
+playsound
