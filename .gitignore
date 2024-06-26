@@ -37,3 +37,4 @@ electricity_monitor_app.exe
 electricity_monitor_app.exe.bak
 *.exe
 *.mp3
+/dist
