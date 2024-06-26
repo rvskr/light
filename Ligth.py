@@ -3,11 +3,11 @@ from tkinter import ttk, messagebox
 import time
 import json
 import threading
-from pywifi import PyWiFi, const
 from gtts import gTTS
 from playsound import playsound
 import os
 import hashlib
+import subprocess
 
 class ConfigManager:
     def __init__(self, config_file="config.json"):
@@ -30,34 +30,20 @@ class ConfigManager:
         except Exception as e:
             print(f"Ошибка сохранения конфигурации: {e}")
 
-class ElectricityMonitor:
+class WindowsWiFiScanner:
     def __init__(self):
-        self.wifi = PyWiFi()
-        self.iface = self.get_wireless_interface()
-
-    def get_wireless_interface(self):
-        try:
-            for iface in self.wifi.interfaces():
-                if iface.name() and iface.status() in [const.IFACE_DISCONNECTED, const.IFACE_SCANNING, const.IFACE_CONNECTING, const.IFACE_CONNECTED]:
-                    return iface
-            raise Exception("Не найден беспроводной интерфейс")
-        except Exception as e:
-            print(f"Ошибка при получении интерфейса: {e}")
-            return None
+        pass
 
     def scan_wifi_networks(self):
         try:
-            if self.iface:
-                if self.iface.status() == const.IFACE_DISCONNECTED:
-                    return 0
-                self.iface.scan()
-                time.sleep(3)
-                results = self.iface.scan_results()
-                if results:
-                    return len(results)
+            result = subprocess.run(["netsh", "wlan", "show", "networks"], capture_output=True, text=True, check=True)
+            networks = [line for line in result.stdout.split('\n') if "SSID" in line]
+            return len(networks)
+        except subprocess.CalledProcessError as e:
+            print(f"Ошибка при выполнении команды netsh: {e}")
             return 0
         except Exception as e:
-            print(f"Ошибка при сканировании сетей Wi-Fi: {e}")
+            print(f"Общая ошибка: {e}")
             return 0
 
 class ElectricityMonitorApp:
@@ -75,7 +61,7 @@ class ElectricityMonitorApp:
 
         self.create_widgets()
         self.monitoring = False
-        self.monitor = ElectricityMonitor()
+        self.scanner = WindowsWiFiScanner()
         self.update_interface_status()
 
     def create_widgets(self):
@@ -103,45 +89,22 @@ class ElectricityMonitorApp:
         self.status_label = ttk.Label(self.master, text="Статус света:")
         self.status_label.grid(row=3, column=0, sticky="w")
 
-        self.status_var = tk.StringVar()
-        self.status_var.set("Неизвестно")
+        self.status_var = tk.StringVar(value="Неизвестно")
         self.status_value_label = ttk.Label(self.master, textvariable=self.status_var)
         self.status_value_label.grid(row=3, column=1, sticky="w")
 
-        self.interface_label = ttk.Label(self.master, text="Ваш интерфейс:")
-        self.interface_label.grid(row=4, column=0, sticky="w")
-
-        self.interface_var = tk.StringVar()
-        self.interface_var.set("Неизвестно")
-        self.interface_value_label = ttk.Label(self.master, textvariable=self.interface_var)
-        self.interface_value_label.grid(row=4, column=1, sticky="w")
-
         self.networks_found_label = ttk.Label(self.master, text="Найдено сетей Wi-Fi:")
-        self.networks_found_label.grid(row=5, column=0, sticky="w")
+        self.networks_found_label.grid(row=4, column=0, sticky="w")
 
-        self.networks_found_var = tk.StringVar()
-        self.networks_found_var.set("Неизвестно")
+        self.networks_found_var = tk.StringVar(value="Неизвестно")
         self.networks_found_value_label = ttk.Label(self.master, textvariable=self.networks_found_var)
-        self.networks_found_value_label.grid(row=5, column=1, sticky="w")
+        self.networks_found_value_label.grid(row=4, column=1, sticky="w")
 
         self.start_stop_button = ttk.Button(self.master, text="Старт", command=self.toggle_monitoring)
-        self.start_stop_button.grid(row=6, columnspan=2)
+        self.start_stop_button.grid(row=5, columnspan=2)
 
     def update_interface_status(self):
-        try:
-            if self.monitor.iface:
-                interface_name = self.monitor.iface.name()
-                interface_status = self.monitor.iface.status()
-                if interface_status == const.IFACE_CONNECTED:
-                    self.interface_var.set(f"{interface_name}: Подключен")
-                elif interface_status == const.IFACE_DISCONNECTED:
-                    self.interface_var.set(f"{interface_name}: Отключен")
-                else:
-                    self.interface_var.set("Неизвестно")
-            else:
-                self.interface_var.set("Не найден")
-        except Exception as e:
-            self.interface_var.set(f"Ошибка: {e}")
+        self.interface_var = tk.StringVar(value="Wi-Fi интерфейс активен")
 
     def generate_notification_filename(self, message):
         try:
@@ -171,14 +134,13 @@ class ElectricityMonitorApp:
 
     def check_electricity(self):
         try:
-            num_networks = self.monitor.scan_wifi_networks()
+            num_networks = self.scanner.scan_wifi_networks()
             self.networks_found_var.set(str(num_networks))
             if num_networks >= int(self.config["num_networks"]):
                 self.status_var.set("Включен")
                 self.send_notification()
             else:
                 self.status_var.set("Выключен")
-            self.update_interface_status()
             self.master.update()
         except Exception as e:
             self.status_var.set(f"Ошибка: {e}")
