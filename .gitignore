@@ -1,5 +1,3 @@
-
-output/notification_6a672caf3527d92754dc09929ef913cb.mp3
 output/Ligth.exe
 output/config.json
 main.dart
@@ -8,8 +6,8 @@ Ligth.exe
 Ligth copy.py
 config.json
 logo (1).ico
-output/notification_922f2e33cac70bd7620acfd1693f2e43.mp3
-notification_922f2e33cac70bd7620acfd1693f2e43.mp3
+output/
+notification_*.mp3
 hello.py
 *.mp3
 *.mp3

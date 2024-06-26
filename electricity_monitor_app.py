@@ -1,3 +1,4 @@
+import os
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
@@ -28,7 +29,7 @@ class ElectricityMonitorApp:
         self.last_status = "Unknown"
 
         self.repo_url = "https://api.github.com/repos/rvskr/light"  # Замените на ваш URL репозитория
-        self.current_version = "1.31"  # Укажите текущую версию вашего приложения
+        self.current_version = "1.32"  # Укажите текущую версию вашего приложения
         self.exe_name = "electricity_monitor_app.exe"
         self.updater = Updater(self.repo_url, self.exe_name, self.current_version)
 
@@ -103,6 +104,7 @@ class ElectricityMonitorApp:
         except Exception as e:
             self.master.after(0, self.status_var.set, f"Error: {e}")  # update via after
 
+
     def start_monitoring(self):
         try:
             new_message = self.message_entry.get()
@@ -112,6 +114,7 @@ class ElectricityMonitorApp:
             self.config["interval"] = int(self.interval_entry.get())
             self.config["message"] = new_message
 
+            # Удаление старого аудиофайла, если сообщение изменилось
             if new_message != old_message:
                 old_audio_file = self.config.get("audio_file", "")
                 if old_audio_file and os.path.exists(old_audio_file):
@@ -126,6 +129,7 @@ class ElectricityMonitorApp:
             self.monitoring_thread.start()
         except Exception as e:
             print(f"Error starting monitoring: {e}")
+
 
     def stop_monitoring(self):
         self.monitoring = False
