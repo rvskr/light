@@ -1,9 +1,8 @@
 import os
 import requests
 import shutil
-import sys
 from tkinter import messagebox, Toplevel, Label, Button
-from multiprocessing import Process
+import sys  
 
 class Updater:
     def __init__(self, repo_url, exe_name, current_version):
@@ -36,24 +35,13 @@ class Updater:
         Label(top, text=f"Доступна новая версия: {latest_release['tag_name']}").pack(pady=10)
         Label(top, text=f"Описание:\n{latest_release['body']}").pack(pady=10)
 
-        download_button = Button(top, text="Скачать", command=lambda: self.start_update_process(latest_release, top))
+        download_button = Button(top, text="Скачать", command=lambda: self.download_new_file(latest_release))
         download_button.pack(pady=10)
 
         close_button = Button(top, text="Закрыть", command=top.destroy)
         close_button.pack(pady=10)
 
-    def start_update_process(self, latest_release, window):
-        try:
-            update_process = Process(target=self.download_and_replace, args=(latest_release,))
-            update_process.start()
-
-            messagebox.showinfo("Успех", "Обновление начато. Приложение будет перезапущено после завершения обновления.")
-            window.destroy()
-
-        except Exception as e:
-            messagebox.showerror("Ошибка", f"Не удалось начать процесс обновления: {e}")
-
-    def download_and_replace(self, latest_release):
+    def download_new_file(self, latest_release):
         assets = latest_release.get('assets', [])
         if not assets:
             messagebox.showerror("Ошибка", "Не удалось найти исполняемый файл для скачивания.")
@@ -73,35 +61,53 @@ class Updater:
             response = requests.get(exe_url, stream=True)
             response.raise_for_status()
 
-            new_exe_path = self.exe_name + ".new"
+            new_exe_path = "temp_" + self.exe_name
             with open(new_exe_path, 'wb') as file:
                 shutil.copyfileobj(response.raw, file)
 
-            current_exe_path = os.path.abspath(self.exe_name)
-            backup_exe_path = self.exe_name + ".bak"
-
-            # Проверяем существование текущего исполняемого файла
-            if not os.path.exists(current_exe_path):
-                messagebox.showerror("Ошибка", f"Не удалось найти текущий исполняемый файл: {self.exe_name}")
-                return
-
-            # Создаем резервную копию текущего исполняемого файла
-            shutil.copyfile(current_exe_path, backup_exe_path)
-
-            # Заменяем текущий исполняемый файл новым
-            os.replace(new_exe_path, current_exe_path)
-
-            messagebox.showinfo("Успех", "Приложение обновлено. Перезапустите его для применения изменений.")
-            self.run_application()
+            messagebox.showinfo("Успех", f"Новый файл скачан: {new_exe_path}")
+            self.create_and_run_bat_file()
 
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Не удалось скачать и заменить файл: {e}")
+            messagebox.showerror("Ошибка", f"Не удалось скачать файл: {e}")
 
-    def run_application(self):
+    def create_and_run_bat_file(self):
+        bat_content = f"""@echo off
+setlocal
+
+set oldFile=temp_{self.exe_name}
+set newFile={self.exe_name}
+set batFile=%~f0
+
+rem Проверяем существование файла {self.exe_name} и удаляем его, если он существует
+if exist "%newFile%" (
+    del "%newFile%"
+    echo Удален файл %newFile%.
+)
+rem Добавляем задержку перед началом выполнения на 3 секунды
+timeout /t 3 >nul
+
+rem Переименовываем temp_{self.exe_name} в {self.exe_name}
+ren "%oldFile%" "%newFile%"
+if errorlevel 1 (
+    echo Ошибка при переименовании файла.
+) else (
+    echo Замена файла завершена.
+    start "" "%newFile%"
+    del "%batFile%"
+)
+
+pause >nul
+"""
+        bat_path = "update.bat"
+        with open(bat_path, 'w') as bat_file:
+            bat_file.write(bat_content)
+
         try:
-            os.startfile(self.exe_name)  # Пытаемся запустить исполняемый файл
+            os.startfile(bat_path)  # Запуск батника
+            sys.exit()  # Завершение программы
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Не удалось запустить приложение: {e}")
+            messagebox.showerror("Ошибка", f"Не удалось запустить файл обновления: {e}")
 
 def compare_versions(version1, version2):
     v1_parts = list(map(int, version1.split('.')))
