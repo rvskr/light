@@ -2,6 +2,8 @@ import requests
 import os
 import shutil
 from tkinter import messagebox, Toplevel, Label, Button
+import subprocess
+import time  # Для добавления задержки перед попыткой замены файла
 
 class Updater:
     def __init__(self, repo_url, exe_name, current_version):
@@ -72,6 +74,17 @@ class Updater:
                 messagebox.showerror("Ошибка", f"Не удалось найти текущий исполняемый файл: {self.exe_name}")
                 return
 
+            # Закрываем текущее приложение, если оно открыто
+            self.close_application()
+
+            # Даем время на закрытие приложения
+            time.sleep(2)  # Увеличить время при необходимости
+
+            # Повторно проверяем, не открыто ли приложение
+            if self.is_application_running():
+                messagebox.showerror("Ошибка", "Не удалось закрыть текущее приложение. Закройте его вручную перед обновлением.")
+                return
+
             # Создаем резервную копию текущего исполняемого файла
             shutil.copyfile(current_exe_path, backup_exe_path)
 
@@ -83,6 +96,22 @@ class Updater:
 
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось скачать и заменить файл: {e}")
+
+    def close_application(self):
+        try:
+            subprocess.call(['taskkill', '/F', '/IM', os.path.basename(self.exe_name)])
+        except Exception as e:
+            print(f"Ошибка при закрытии приложения: {e}")
+
+    def is_application_running(self):
+        try:
+            output = subprocess.check_output(['tasklist', '/FI', f'IMAGENAME eq {os.path.basename(self.exe_name)}'], shell=True, stderr=subprocess.STDOUT)
+            output_decoded = output.decode('utf-8', errors='ignore')
+            return True if os.path.basename(self.exe_name) in output_decoded else False
+        except Exception as e:
+            print(f"Ошибка при проверке запущенного приложения: {e}")
+            return False
+
 
 def compare_versions(version1, version2):
     v1_parts = list(map(int, version1.split('.')))
