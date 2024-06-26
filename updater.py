@@ -1,9 +1,9 @@
-import requests
 import os
+import requests
 import shutil
+import sys
 from tkinter import messagebox, Toplevel, Label, Button
-import subprocess
-import time  # Для добавления задержки перед попыткой замены файла
+from multiprocessing import Process
 
 class Updater:
     def __init__(self, repo_url, exe_name, current_version):
@@ -36,13 +36,24 @@ class Updater:
         Label(top, text=f"Доступна новая версия: {latest_release['tag_name']}").pack(pady=10)
         Label(top, text=f"Описание:\n{latest_release['body']}").pack(pady=10)
 
-        download_button = Button(top, text="Скачать", command=lambda: self.download_and_replace(latest_release, top))
+        download_button = Button(top, text="Скачать", command=lambda: self.start_update_process(latest_release, top))
         download_button.pack(pady=10)
 
         close_button = Button(top, text="Закрыть", command=top.destroy)
         close_button.pack(pady=10)
 
-    def download_and_replace(self, latest_release, window):
+    def start_update_process(self, latest_release, window):
+        try:
+            update_process = Process(target=self.download_and_replace, args=(latest_release,))
+            update_process.start()
+
+            messagebox.showinfo("Успех", "Обновление начато. Приложение будет перезапущено после завершения обновления.")
+            window.destroy()
+
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось начать процесс обновления: {e}")
+
+    def download_and_replace(self, latest_release):
         assets = latest_release.get('assets', [])
         if not assets:
             messagebox.showerror("Ошибка", "Не удалось найти исполняемый файл для скачивания.")
@@ -74,17 +85,6 @@ class Updater:
                 messagebox.showerror("Ошибка", f"Не удалось найти текущий исполняемый файл: {self.exe_name}")
                 return
 
-            # Закрываем текущее приложение, если оно открыто
-            self.close_application()
-
-            # Даем время на закрытие приложения
-            time.sleep(2)  # Увеличить время при необходимости
-
-            # Повторно проверяем, не открыто ли приложение
-            if self.is_application_running():
-                messagebox.showerror("Ошибка", "Не удалось закрыть текущее приложение. Закройте его вручную перед обновлением.")
-                return
-
             # Создаем резервную копию текущего исполняемого файла
             shutil.copyfile(current_exe_path, backup_exe_path)
 
@@ -92,26 +92,16 @@ class Updater:
             os.replace(new_exe_path, current_exe_path)
 
             messagebox.showinfo("Успех", "Приложение обновлено. Перезапустите его для применения изменений.")
-            window.destroy()
+            self.run_application()
 
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось скачать и заменить файл: {e}")
 
-    def close_application(self):
+    def run_application(self):
         try:
-            subprocess.call(['taskkill', '/F', '/IM', os.path.basename(self.exe_name)])
+            os.startfile(self.exe_name)  # Пытаемся запустить исполняемый файл
         except Exception as e:
-            print(f"Ошибка при закрытии приложения: {e}")
-
-    def is_application_running(self):
-        try:
-            output = subprocess.check_output(['tasklist', '/FI', f'IMAGENAME eq {os.path.basename(self.exe_name)}'], shell=True, stderr=subprocess.STDOUT)
-            output_decoded = output.decode('utf-8', errors='ignore')
-            return True if os.path.basename(self.exe_name) in output_decoded else False
-        except Exception as e:
-            print(f"Ошибка при проверке запущенного приложения: {e}")
-            return False
-
+            messagebox.showerror("Ошибка", f"Не удалось запустить приложение: {e}")
 
 def compare_versions(version1, version2):
     v1_parts = list(map(int, version1.split('.')))
@@ -126,4 +116,4 @@ def compare_versions(version1, version2):
         elif v1_part > v2_part:
             return 1
 
-    return 0  # версии равны
+    return 0
