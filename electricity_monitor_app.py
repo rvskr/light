@@ -29,7 +29,7 @@ class ElectricityMonitorApp:
         self.last_status = "Unknown"
 
         self.repo_url = "https://api.github.com/repos/rvskr/light"  # Замените на ваш URL репозитория
-        self.current_version = "1.31"  # Укажите текущую версию вашего приложения
+        self.current_version = "1.32"  # Укажите текущую версию вашего приложения
         self.exe_name = "electricity_monitor_app.exe"
         self.updater = Updater(self.repo_url, self.exe_name, self.current_version)
 
