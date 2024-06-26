@@ -1,4 +1,0 @@
-tk
-pywifi
-gtts
-playsound
