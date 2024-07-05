@@ -38,3 +38,6 @@ electricity_monitor_app.exe.bak
 *.exe
 *.mp3
 /dist
+app py/__pycache__/wifi_scanner.cpython-312.pyc
+wokr.py
+app py/__pycache__/wifi_scanner.cpython-312.pyc
